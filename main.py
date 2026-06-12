@@ -14,9 +14,14 @@ app.add_middleware(
 )
 
 
-def generate_smart_candidates():
-    """Gera candidatos de forma mais realista e variada"""
-    
+def generate_aggressive_candidates(regime: str = "RISK_ON"):
+    """
+    Gera candidatos de forma agressiva.
+    RISK_ON = mais setups de alto risco e alta volatilidade
+    RISK_OFF = mais conservador
+    NEUTRAL = equilibrado
+    """
+
     base_tickers = [
         {"ticker": "HCAI", "base_price": 9.40},
         {"ticker": "TGL", "base_price": 5.15},
@@ -25,31 +30,38 @@ def generate_smart_candidates():
         {"ticker": "SOXS", "base_price": 6.15},
         {"ticker": "MBAVU", "base_price": 13.10},
         {"ticker": "CCHH", "base_price": 0.85},
+        {"ticker": "VSME", "base_price": 2.60},
     ]
 
     candidates = []
 
     for stock in base_tickers:
-        # Variação de preço entre -8% e +38%
-        change = round(random.uniform(-8.0, 38.0), 1)
-        price = round(stock["base_price"] * (1 + change/100), 2)
-        volume = random.randint(750_000, 4_800_000)
+        # Define o range de variação conforme o regime
+        if regime == "RISK_ON":
+            change = round(random.uniform(-5.0, 42.0), 1)  # Mais agressivo
+        elif regime == "RISK_OFF":
+            change = round(random.uniform(-12.0, 18.0), 1)  # Mais conservador
+        else:  # NEUTRAL
+            change = round(random.uniform(-8.0, 28.0), 1)
 
-        # Lógica de qualidade do setup
-        if change >= 22 and volume > 2_000_000:
-            grade = random.choice(["A", "A-"])
-            risk = "LOW"
-            score = round(random.uniform(7.8, 9.3), 1)
-            stage = "EARLY"
-        elif change >= 10:
+        price = round(stock["base_price"] * (1 + change / 100), 2)
+        volume = random.randint(650_000, 5_200_000)
+
+        # Lógica de Setup Grade e Risco (mais agressiva)
+        if change >= 25 and volume > 1_800_000:
+            grade = random.choice(["A", "A-", "B+"])
+            risk = random.choice(["MEDIUM", "HIGH"])   # Mais risco
+            score = round(random.uniform(7.2, 9.4), 1)
+            stage = random.choice(["EARLY", "DEVELOPING"])
+        elif change >= 12:
             grade = random.choice(["B+", "B", "B-"])
             risk = "MEDIUM"
-            score = round(random.uniform(5.9, 7.6), 1)
+            score = round(random.uniform(5.5, 7.5), 1)
             stage = "DEVELOPING"
         else:
             grade = random.choice(["C+", "C", "C-"])
             risk = random.choice(["HIGH", "MEDIUM"])
-            score = round(random.uniform(3.2, 5.4), 1)
+            score = round(random.uniform(2.8, 5.2), 1)
             stage = "EXTENDED"
 
         candidates.append({
@@ -66,17 +78,19 @@ def generate_smart_candidates():
                 "Contrato relevante anunciado",
                 "Volume anormal + gap técnico",
                 "Possível short squeeze",
-                "Movimento setorial sem catalisador claro"
+                "Movimento setorial sem catalisador claro",
+                "Hype de baixo float"
             ]),
             "red_flags": random.choice([
                 "Nenhum",
                 "Float baixo - alta volatilidade",
                 "Liquidez moderada",
-                "Já subiu muito no dia",
-                "Sem catalisador fundamental claro"
+                "Já subiu muito no dia - risco de reversão",
+                "Sem catalisador fundamental claro",
+                "Alto risco de pump and dump"
             ]),
-            "liquidity_score": random.randint(4, 8),
-            "comment": "Setup gerado dinamicamente"
+            "liquidity_score": random.randint(3, 8),
+            "comment": "Setup gerado de forma agressiva"
         })
 
     # Ordena do melhor para o pior
@@ -86,19 +100,20 @@ def generate_smart_candidates():
 
 @app.get("/")
 def root():
-    return {"message": "Stock Scanner AI está rodando", "status": "ok"}
+    return {"message": "Stock Scanner AI - Gap + Momentum", "status": "online"}
 
 
 @app.get("/api/v1/scan")
 def scan(
     mode: str = Query("auto"),
-    preferred_ai: str = Query("grok")
+    preferred_ai: str = Query("grok"),
+    regime: str = Query("RISK_ON", description="RISK_ON, RISK_OFF ou NEUTRAL")
 ):
-    candidates = generate_smart_candidates()
+    candidates = generate_aggressive_candidates(regime=regime)
 
     return {
         "timestamp": datetime.now().isoformat(),
-        "market_regime": "RISK-ON",
+        "market_regime": regime,
         "mode": mode,
         "preferred_ai": preferred_ai,
         "total_candidates": len(candidates),
